@@ -425,7 +425,7 @@ public class StandardService extends LifecycleMBeanBase implements Service {
             }
         }
 
-        //启动executor
+        //启动executor 个数为0
         synchronized (executors) {
             for (Executor executor: executors) {
                 executor.start();
@@ -548,7 +548,8 @@ public class StandardService extends LifecycleMBeanBase implements Service {
         }
 
         // Initialize mapper listener
-        //将mapperListener注册到MBeanServer
+        //将mapperlistener继承自lifecylembeanbase 自身没有对startinternal做重写 所以 
+        //mapperListener只是注册到MBeanServer 和改变初始化状态
         mapperListener.init();
 
         // Initialize our defined Connectors

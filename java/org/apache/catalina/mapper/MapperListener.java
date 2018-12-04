@@ -100,14 +100,15 @@ public class MapperListener extends LifecycleMBeanBase
         if (engine == null) {
             return;
         }
-
+        //获取service包含的容器（引擎）的defaulthost，并查找子容器（host）中有没有与之匹配的name，如果没有则抛出异常
         findDefaultHost();
-
+        //添加自己(既是lifecyclelistener又是containerlistener)到engine容器和其所有子容器host中
         addListeners(engine);
 
         Container[] conHosts = engine.findChildren();
         for (Container conHost : conHosts) {
             Host host = (Host) conHost;
+            //
             if (!LifecycleState.NEW.equals(host.getState())) {
                 // Registering the host will register the context and wrappers
                 registerHost(host);
@@ -262,11 +263,13 @@ public class MapperListener extends LifecycleMBeanBase
     private void findDefaultHost() {
 
         Engine engine = service.getContainer();
+        //defaulthost是在server.xml配置文件中设置的
         String defaultHost = engine.getDefaultHost();
 
         boolean found = false;
 
         if (defaultHost != null && defaultHost.length() >0) {
+        	//server.xml配置的host标签
             Container[] containers = engine.findChildren();
 
             for (Container container : containers) {
@@ -275,7 +278,8 @@ public class MapperListener extends LifecycleMBeanBase
                     found = true;
                     break;
                 }
-
+                //engine的defaulthost需要和子容器中的一个host的name/别名相同，否则
+                //抛出位置默认主机异常
                 String[] aliases = host.findAliases();
                 for (String alias : aliases) {
                     if (defaultHost.equalsIgnoreCase(alias)) {

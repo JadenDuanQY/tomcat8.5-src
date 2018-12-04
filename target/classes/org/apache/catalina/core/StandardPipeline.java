@@ -175,6 +175,7 @@ public class StandardPipeline extends LifecycleBase
     	//阀链开启状态，继承了LifecyleMBeanBase 会被注册到jmx
         // Start the Valves in our pipeline (including the basic), if any
         Valve current = first;
+        //basic 是 standardengine/host等在初始化时赋值
         if (current == null) {
             current = basic;
         }

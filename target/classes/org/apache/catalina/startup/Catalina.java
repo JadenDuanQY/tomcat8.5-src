@@ -304,7 +304,7 @@ public class Catalina {
         digester.addSetNext("Server/GlobalNamingResources",
                             "setGlobalNamingResources",
                             "org.apache.catalina.deploy.NamingResourcesImpl");
-
+        //listener属性配置 null的话，在xml里配置linstener时 classname必须不能为空
         digester.addObjectCreate("Server/Listener",
                                  null, // MUST be specified in the element
                                  "className");
