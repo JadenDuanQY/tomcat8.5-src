@@ -944,9 +944,11 @@ public abstract class ContainerBase extends LifecycleMBeanBase
          *	3. FutureTask继承并实现了Runable接口，run方法会调用初始化传入的Callable对象的call方法
          *	4. StartChild的call方法会执行构造函数传入的对象Container类型的start方法
          */
-        //此处有一个child host
-        
-        //容器链启动对valve的影响
+        //此处有一个child是host
+        //submit方法会初始化future对象并执行调用线程执行器的execute开了一个线程执行future（runable），就会调用childs的start（）方法
+        //因为只有一个child host 那么就会执行host 的start方法，还是老流程，lifecyclebase start(是否初始化。没有就
+        //初始化再start)- lifecyclembeanbase startinternal(注册mbean) - 
+        //本身重写的startinternal
         List<Future<Void>> results = new ArrayList<>();
         for (int i = 0; i < children.length; i++) {
             results.add(startStopExecutor.submit(new StartChild(children[i])));

@@ -725,7 +725,8 @@ public class StandardHost extends ContainerBase implements Host {
      */
     @Override
     public void addChild(Container child) {
-
+    	
+    	//context添加内存泄露监听器
         child.addLifecycleListener(new MemoryLeakTrackingListener());
 
         if (!(child instanceof Context))
@@ -845,7 +846,7 @@ public class StandardHost extends ContainerBase implements Host {
     @Override
     protected synchronized void startInternal() throws LifecycleException {
 
-        // Set error report valve
+        // Set error report valve 默认就有值 org.apache.catalina.valves.ErrorReportValve
         String errorValve = getErrorReportValveClass();
         if ((errorValve != null) && (!errorValve.equals(""))) {
             try {
@@ -869,6 +870,7 @@ public class StandardHost extends ContainerBase implements Host {
                         errorValve), t);
             }
         }
+        //standrdhost是如何添加context的
         super.startInternal();
     }
 

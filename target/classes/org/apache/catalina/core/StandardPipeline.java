@@ -354,7 +354,7 @@ public class StandardPipeline extends LifecycleBase
                 }
             }
         }
-
+        //把插入的valve放到basic之前，也就是倒数第二位置
         // Add this Valve to the set associated with this Pipeline
         if (first == null) {
             first = valve;
