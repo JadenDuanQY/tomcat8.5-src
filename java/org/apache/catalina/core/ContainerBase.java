@@ -946,7 +946,7 @@ public abstract class ContainerBase extends LifecycleMBeanBase
          */
         //此处有一个child host
         
-        //容器链启动对valve对影响
+        //容器链启动对valve的影响
         List<Future<Void>> results = new ArrayList<>();
         for (int i = 0; i < children.length; i++) {
             results.add(startStopExecutor.submit(new StartChild(children[i])));
