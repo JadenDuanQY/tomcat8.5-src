@@ -395,7 +395,9 @@ public class Catalina {
 
         // Add RuleSets for nested elements
         digester.addRuleSet(new NamingRuleSet("Server/GlobalNamingResources/"));
+        //初始化engine同时添加org.apache.catalina.startup.EngineConfig监听器
         digester.addRuleSet(new EngineRuleSet("Server/Service/"));
+        //初始化 standardhost 同时添加org.apache.catalina.startup.HostConfig监听器
         digester.addRuleSet(new HostRuleSet("Server/Service/Engine/"));
         digester.addRuleSet(new ContextRuleSet("Server/Service/Engine/Host/"));
         addClusterRuleSet(digester, "Server/Service/Engine/Host/Cluster/");
