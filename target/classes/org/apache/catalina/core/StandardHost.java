@@ -229,11 +229,14 @@ public class StandardHost extends ContainerBase implements Host {
         File file = new File(getAppBase());
 
         // If not absolute, make it absolute
+        //判断是否为绝对路径
         if (!file.isAbsolute()) {
+        	//获取在Tomcat根目录下的webapps的文件描述符
             file = new File(getCatalinaBase(), file.getPath());
         }
 
         // Make it canonical if possible
+        //获取规范路径的文件描述符
         try {
             file = file.getCanonicalFile();
         } catch (IOException ioe) {
@@ -312,14 +315,17 @@ public class StandardHost extends ContainerBase implements Host {
             Container parent = getParent();
             if (parent instanceof Engine) {
                 xmlDir.append('/');
+                //engine的名字是catalina
                 xmlDir.append(parent.getName());
             }
             xmlDir.append('/');
+            //host的name是localhost
             xmlDir.append(getName());
             path = xmlDir.toString();
         }
         File file = new File(path);
         if (!file.isAbsolute())
+        	//tomcat根目录下的conf/catalina/localhost文件描述符
             file = new File(getCatalinaBase(), path);
         try {
             file = file.getCanonicalFile();

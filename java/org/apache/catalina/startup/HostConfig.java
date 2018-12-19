@@ -294,14 +294,20 @@ public class HostConfig implements LifecycleListener {
      */
     @Override
     public void lifecycleEvent(LifecycleEvent event) {
-
+    	
+    	System.out.println("当前是"+event.getType());
         // Identify the host we are associated with
+    	// 每次状态变更都会执行下面的代码，如果直接指定可以更效率
         try {
+        	//getLifecycle返回的是source属性，source属性是LifecycleEvent实例化事被引用为发生事件的对象
             host = (Host) event.getLifecycle();
             if (host instanceof StandardHost) {
+            	//设置是否拷贝xml到conf目录下
                 setCopyXML(((StandardHost) host).isCopyXML());
                 setDeployXML(((StandardHost) host).isDeployXML());
+                //设置是否解包
                 setUnpackWARs(((StandardHost) host).isUnpackWARs());
+                //设置context class为org.apache.catalina.core.StandardContext
                 setContextClass(((StandardHost) host).getContextClass());
             }
         } catch (ClassCastException e) {
@@ -310,9 +316,11 @@ public class HostConfig implements LifecycleListener {
         }
 
         // Process the event that has occurred
+        // PERIODIC_EVENT事件触发是在容器的backgroundprocess执行的时候设置的
         if (event.getType().equals(Lifecycle.PERIODIC_EVENT)) {
             check();
         } else if (event.getType().equals(Lifecycle.BEFORE_START_EVENT)) {
+        	//创建 webapps与conf/catalina/localhost目录
             beforeStart();
         } else if (event.getType().equals(Lifecycle.START_EVENT)) {
             start();
@@ -1545,8 +1553,11 @@ public class HostConfig implements LifecycleListener {
 
     public void beforeStart() {
         if (host.getCreateDirs()) {
+        	//tomcat根目录下的(webapps文件描述符和conf/catalina/localhost文件描述符)
             File[] dirs = new File[] {host.getAppBaseFile(),host.getConfigBaseFile()};
+            //创建这两个目录
             for (int i=0; i<dirs.length; i++) {
+            	//如果文件描述符已被创建且不是目录报error
                 if (!dirs[i].mkdirs() && !dirs[i].isDirectory()) {
                     log.error(sm.getString("hostConfig.createDirs",dirs[i]));
                 }
@@ -1609,7 +1620,8 @@ public class HostConfig implements LifecycleListener {
      * Check status of all webapps.
      */
     protected void check() {
-
+    	
+    	//standardhost默认自动部署
         if (host.getAutoDeploy()) {
             // Check for resources modification to trigger redeployment
             DeployedApplication[] apps =
