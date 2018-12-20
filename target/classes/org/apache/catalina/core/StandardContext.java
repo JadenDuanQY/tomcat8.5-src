@@ -165,6 +165,7 @@ public class StandardContext extends ContainerBase
         if (!Globals.STRICT_SERVLET_COMPLIANCE) {
             // Strict servlet compliance requires all extension mapped servlets
             // to be checked against welcome files
+        	// 后缀为.jsp的文件为servlet
             resourceOnlyServlets.add("jsp");
         }
     }
@@ -364,6 +365,7 @@ public class StandardContext extends ContainerBase
 
     /**
      * The document root for this web application.
+     * 源代码路径
      */
     private String docBase = null;
 

@@ -43,7 +43,7 @@ public final class ContextName {
      *                              removed?
      */
     public ContextName(String name, boolean stripFileExtension) {
-
+    	//假设 test.xml
         String tmp1 = name;
 
         // Convert Context names and display names to base names
@@ -67,7 +67,7 @@ public final class ContextName {
                         tmp1.toLowerCase(Locale.ENGLISH).endsWith(".xml"))) {
             tmp1 = tmp1.substring(0, tmp1.length() -4);
         }
-
+        //此处成为test
         baseName = tmp1;
 
         String tmp2;
@@ -84,6 +84,7 @@ public final class ContextName {
         if (ROOT_NAME.equals(tmp2)) {
             path = "";
         } else {
+        	//path为/test/
             path = "/" + tmp2.replaceAll(FWD_SLASH_REPLACEMENT, "/");
         }
 

@@ -323,7 +323,8 @@ public class HostConfig implements LifecycleListener {
         	//创建 webapps与conf/catalina/localhost目录
             beforeStart();
         } else if (event.getType().equals(Lifecycle.START_EVENT)) {
-            start();
+            //host start（）时调用
+        	start();
         } else if (event.getType().equals(Lifecycle.STOP_EVENT)) {
             stop();
         }
@@ -404,7 +405,7 @@ public class HostConfig implements LifecycleListener {
     protected static Digester createDigester(String contextClassName) {
         Digester digester = new Digester();
         digester.setValidating(false);
-        // Add object creation rule
+        // Add object creation rule contextclassname是standardcontext
         digester.addObjectCreate("Context", contextClassName, "className");
         // Set the properties on that object (it doesn't matter if extra
         // properties are set)
@@ -439,9 +440,11 @@ public class HostConfig implements LifecycleListener {
      * in our "application root" directory.
      */
     protected void deployApps() {
-
+    	//tomcat根目录下的webapps
         File appBase = host.getAppBaseFile();
+        //tomcat根目录下的conf/catalina/localhost
         File configBase = host.getConfigBaseFile();
+        //根据host对象中的deployignore属性过滤不需要部署的文件
         String[] filteredAppPaths = filterAppPaths(appBase.list());
         // Deploy XML descriptors from configBase
         deployDescriptors(configBase, configBase.list());
@@ -539,18 +542,21 @@ public class HostConfig implements LifecycleListener {
             File contextXml = new File(configBase, files[i]);
 
             if (files[i].toLowerCase(Locale.ENGLISH).endsWith(".xml")) {
+            	//name: test path: /test/
                 ContextName cn = new ContextName(files[i], true);
 
                 if (isServiced(cn.getName()) || deploymentExists(cn.getName()))
                     continue;
-
+                //老方法，使用es线（host的线程池）程池来执行DeployDescriptor内部类（runnable实现类）
+                //DeployDescriptor会调用传入的this的deployDescriptor方法
                 results.add(
                         es.submit(new DeployDescriptor(this, cn, contextXml)));
             }
         }
-
+        //等待所有的Future执行完毕
         for (Future<?> result : results) {
             try {
+            	//等待Future执行完毕
                 result.get();
             } catch (Exception e) {
                 log.error(sm.getString(
@@ -585,6 +591,8 @@ public class HostConfig implements LifecycleListener {
         File expandedDocBase = null;
 
         try (FileInputStream fis = new FileInputStream(contextXml)) {
+        	//枷锁是因为线程池里的DeployDescriptor线程都调用同一个HostConfig对象的deployDescriptor
+        	//为了保障线程并发执行时digester的解析配置唯一
             synchronized (digesterLock) {
                 try {
                     context = (Context) digester.parse(fis);
@@ -609,8 +617,10 @@ public class HostConfig implements LifecycleListener {
             context.setPath(cn.getPath());
             context.setWebappVersion(cn.getVersion());
             // Add the associated docBase to the redeployed list if it's a WAR
+            // 源代码路径
             if (context.getDocBase() != null) {
                 File docBase = new File(context.getDocBase());
+                //如果不是绝对路径，就去webapps下面去找
                 if (!docBase.isAbsolute()) {
                     docBase = new File(host.getAppBaseFile(), context.getDocBase());
                 }
@@ -644,21 +654,23 @@ public class HostConfig implements LifecycleListener {
 
             // default to appBase dir + name
             expandedDocBase = new File(host.getAppBaseFile(), cn.getBaseName());
+            // 如果context指定的代码不为war包
             if (context.getDocBase() != null
                     && !context.getDocBase().toLowerCase(Locale.ENGLISH).endsWith(".war")) {
-                // first assume docBase is absolute
-                expandedDocBase = new File(context.getDocBase());
+                // first assume docBase is absolute 确认context.getDocBase()是绝对路径
+            	//设置绝对路径的expandedDocBase文件描述符
+            	expandedDocBase = new File(context.getDocBase());
                 if (!expandedDocBase.isAbsolute()) {
                     // if docBase specified and relative, it must be relative to appBase
                     expandedDocBase = new File(host.getAppBaseFile(), context.getDocBase());
                 }
             }
-
+            //
             boolean unpackWAR = unpackWARs;
             if (unpackWAR && context instanceof StandardContext) {
                 unpackWAR = ((StandardContext) context).getUnpackWAR();
             }
-
+            //接下来查看到底是怎么部署项目还有deployedApp到底put记录什么东西
             // Add the eventual unpacked WAR and all the resources which will be
             // watched inside it
             if (isExternalWar) {
@@ -1575,6 +1587,7 @@ public class HostConfig implements LifecycleListener {
             log.debug(sm.getString("hostConfig.start"));
 
         try {
+        	//host注册jmx返回的objectname
             ObjectName hostON = host.getObjectName();
             oname = new ObjectName
                 (hostON.getDomain() + ":type=Deployer,host=" + host.getName());
@@ -1583,7 +1596,8 @@ public class HostConfig implements LifecycleListener {
         } catch (Exception e) {
             log.error(sm.getString("hostConfig.jmx.register", oname), e);
         }
-
+        
+        //判断appbasefile是否为文件夹 Tomcat根目录下的webapps
         if (!host.getAppBaseFile().isDirectory()) {
             log.error(sm.getString("hostConfig.appBase", host.getName(),
                     host.getAppBaseFile().getPath()));

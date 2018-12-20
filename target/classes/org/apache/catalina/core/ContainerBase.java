@@ -956,8 +956,10 @@ public abstract class ContainerBase extends LifecycleMBeanBase
 
         MultiThrowable multiThrowable = new MultiThrowable();
 
+        //等待所有的Future执行完毕
         for (Future<Void> result : results) {
             try {
+            	//等待Future执行完毕
                 result.get();
             } catch (Throwable e) {
                 log.error(sm.getString("containerBase.threadedStartFailed"), e);
