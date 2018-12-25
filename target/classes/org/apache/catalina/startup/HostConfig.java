@@ -320,7 +320,7 @@ public class HostConfig implements LifecycleListener {
         if (event.getType().equals(Lifecycle.PERIODIC_EVENT)) {
             check();
         } else if (event.getType().equals(Lifecycle.BEFORE_START_EVENT)) {
-        	//创建 webapps与conf/catalina/localhost目录
+        	//如果目录不存在则创建 webapps与conf/catalina/localhost目录
             beforeStart();
         } else if (event.getType().equals(Lifecycle.START_EVENT)) {
             //host start（）时调用
@@ -447,6 +447,7 @@ public class HostConfig implements LifecycleListener {
         //根据host对象中的deployignore属性过滤不需要部署的文件
         String[] filteredAppPaths = filterAppPaths(appBase.list());
         // Deploy XML descriptors from configBase
+        // 读取conf/Catalina/localhost/中所有的.xml文件，配置
         deployDescriptors(configBase, configBase.list());
         // Deploy WARs
         deployWARs(appBase, filteredAppPaths);
@@ -542,12 +543,12 @@ public class HostConfig implements LifecycleListener {
             File contextXml = new File(configBase, files[i]);
 
             if (files[i].toLowerCase(Locale.ENGLISH).endsWith(".xml")) {
-            	//name: test path: /test/
+            	//name: test   path: /test/
                 ContextName cn = new ContextName(files[i], true);
 
                 if (isServiced(cn.getName()) || deploymentExists(cn.getName()))
                     continue;
-                //老方法，使用es线（host的线程池）程池来执行DeployDescriptor内部类（runnable实现类）
+                //老方法，使用es线程池（host的线程池）来执行DeployDescriptor内部类（runnable实现类）
                 //DeployDescriptor会调用传入的this的deployDescriptor方法
                 results.add(
                         es.submit(new DeployDescriptor(this, cn, contextXml)));
@@ -591,7 +592,7 @@ public class HostConfig implements LifecycleListener {
         File expandedDocBase = null;
 
         try (FileInputStream fis = new FileInputStream(contextXml)) {
-        	//枷锁是因为线程池里的DeployDescriptor线程都调用同一个HostConfig对象的deployDescriptor
+        	//加锁是因为线程池里的DeployDescriptor线程都调用同一个HostConfig对象的deployDescriptor
         	//为了保障线程并发执行时digester的解析配置唯一
             synchronized (digesterLock) {
                 try {
@@ -617,20 +618,24 @@ public class HostConfig implements LifecycleListener {
             context.setPath(cn.getPath());
             context.setWebappVersion(cn.getVersion());
             // Add the associated docBase to the redeployed list if it's a WAR
-            // 源代码路径
+            // docbase是源代码路径
             if (context.getDocBase() != null) {
                 File docBase = new File(context.getDocBase());
-                //如果不是绝对路径，就去webapps下面去找
+                //如果是相对路径，就去webapps下面去找
                 if (!docBase.isAbsolute()) {
                     docBase = new File(host.getAppBaseFile(), context.getDocBase());
                 }
                 // If external docBase, register .xml as redeploy first
+                // 如果代码在不在webapps目录里
                 if (!docBase.getCanonicalPath().startsWith(
                         host.getAppBaseFile().getAbsolutePath() + File.separator)) {
-                    isExternal = true;
+                    //外部标识符
+                	isExternal = true;
+                	// /root/conf/catalina/localhost/context.xml
                     deployedApp.redeployResources.put(
                             contextXml.getAbsolutePath(),
                             Long.valueOf(contextXml.lastModified()));
+                    // context.xml中配置的外部docBase的绝对路径
                     deployedApp.redeployResources.put(docBase.getAbsolutePath(),
                             Long.valueOf(docBase.lastModified()));
                     if (docBase.getAbsolutePath().toLowerCase(Locale.ENGLISH).endsWith(".war")) {
@@ -643,29 +648,31 @@ public class HostConfig implements LifecycleListener {
                     context.setDocBase(null);
                 }
             }
-
+            //host添加子容器（standardcontext）
             host.addChild(context);
         } catch (Throwable t) {
             ExceptionUtils.handleThrowable(t);
             log.error(sm.getString("hostConfig.deployDescriptor.error",
                                    contextXml.getAbsolutePath()), t);
         } finally {
-            // Get paths for WAR and expanded WAR in appBase
+            // Get paths for WAR and expanded WAR in appBase 获取war包路径然后解压到webapps目录中
 
             // default to appBase dir + name
             expandedDocBase = new File(host.getAppBaseFile(), cn.getBaseName());
-            // 如果context指定的代码不为war包
+            // 如果context指定的代码不为war包 如果docbase属性没有配置，
+            //那么就会去webapps下找context.xml名字的代码
             if (context.getDocBase() != null
                     && !context.getDocBase().toLowerCase(Locale.ENGLISH).endsWith(".war")) {
                 // first assume docBase is absolute 确认context.getDocBase()是绝对路径
-            	//设置绝对路径的expandedDocBase文件描述符
+            	// 设置绝对路径的expandedDocBase文件描述符
             	expandedDocBase = new File(context.getDocBase());
+            	// 如果docbase是相对路径，那么就是指的webapps目录下的代码
                 if (!expandedDocBase.isAbsolute()) {
                     // if docBase specified and relative, it must be relative to appBase
                     expandedDocBase = new File(host.getAppBaseFile(), context.getDocBase());
                 }
             }
-            //
+            //根据context unpackwar的配置来判断是否解包
             boolean unpackWAR = unpackWARs;
             if (unpackWAR && context instanceof StandardContext) {
                 unpackWAR = ((StandardContext) context).getUnpackWAR();
@@ -673,29 +680,38 @@ public class HostConfig implements LifecycleListener {
             //接下来查看到底是怎么部署项目还有deployedApp到底put记录什么东西
             // Add the eventual unpacked WAR and all the resources which will be
             // watched inside it
+            //如果war包在webapps外部
             if (isExternalWar) {
                 if (unpackWAR) {
+                	// /外部/app.war
                     deployedApp.redeployResources.put(expandedDocBase.getAbsolutePath(),
                             Long.valueOf(expandedDocBase.lastModified()));
                     addWatchedResources(deployedApp, expandedDocBase.getAbsolutePath(), context);
                 } else {
                     addWatchedResources(deployedApp, null, context);
-                }
-            } else {
+                }   
+            }
+            //如果是webapp目录中的代码
+            else {
                 // Find an existing matching war and expanded folder
+            	// 如果不是外部的
                 if (!isExternal) {
+                	//获取文件的war文件描述符
                     File warDocBase = new File(expandedDocBase.getAbsolutePath() + ".war");
                     if (warDocBase.exists()) {
+                    	// /root/webapps/app.war
                         deployedApp.redeployResources.put(warDocBase.getAbsolutePath(),
                                 Long.valueOf(warDocBase.lastModified()));
                     } else {
                         // Trigger a redeploy if a WAR is added
+                    	// /root/webapps/app.war
                         deployedApp.redeployResources.put(
                                 warDocBase.getAbsolutePath(),
                                 Long.valueOf(0));
                     }
                 }
                 if (unpackWAR) {
+                	// /root/webapps/app/
                     deployedApp.redeployResources.put(expandedDocBase.getAbsolutePath(),
                             Long.valueOf(expandedDocBase.lastModified()));
                     addWatchedResources(deployedApp,
@@ -703,6 +719,7 @@ public class HostConfig implements LifecycleListener {
                 } else {
                     addWatchedResources(deployedApp, null, context);
                 }
+                //如果指定的代码在webapps下面
                 if (!isExternal) {
                     // For external docBases, the context.xml will have been
                     // added above.
@@ -713,9 +730,11 @@ public class HostConfig implements LifecycleListener {
             }
             // Add the global redeploy resources (which are never deleted) at
             // the end so they don't interfere with the deletion process
+            //添加conf/context.xml 和 conf/catalina/localhost/context.xml.default(如果存在的话)到deployedApp
+            //中的redeployResources
             addGlobalRedeployResources(deployedApp);
         }
-
+        //如果host子容器中添加了该context
         if (host.findChild(context.getName()) != null) {
             deployed.put(context.getName(), deployedApp);
         }

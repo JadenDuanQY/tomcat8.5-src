@@ -5006,7 +5006,8 @@ public class StandardContext extends ContainerBase
      */
     @Override
     protected synchronized void startInternal() throws LifecycleException {
-
+        
+    	//standardcontext启动过程
         if(log.isDebugEnabled())
             log.debug("Starting " + getBaseName());
 
