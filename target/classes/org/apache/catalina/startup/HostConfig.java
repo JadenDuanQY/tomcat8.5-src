@@ -316,7 +316,7 @@ public class HostConfig implements LifecycleListener {
         }
 
         // Process the event that has occurred
-        // PERIODIC_EVENT事件触发是在容器的backgroundprocess执行的时候设置的
+        // PERIODIC_EVENT事件触发是在容器的backgroundprocess执行的时候设置的，host先starting再启动backgroundprocess
         if (event.getType().equals(Lifecycle.PERIODIC_EVENT)) {
             check();
         } else if (event.getType().equals(Lifecycle.BEFORE_START_EVENT)) {
@@ -545,7 +545,7 @@ public class HostConfig implements LifecycleListener {
             if (files[i].toLowerCase(Locale.ENGLISH).endsWith(".xml")) {
             	//name: test   path: /test/
                 ContextName cn = new ContextName(files[i], true);
-
+                //如果deployment中已经添加了该应用或者serviced list中包含该应用则忽略执行下一个context.xml部署
                 if (isServiced(cn.getName()) || deploymentExists(cn.getName()))
                     continue;
                 //老方法，使用es线程池（host的线程池）来执行DeployDescriptor内部类（runnable实现类）
@@ -626,7 +626,7 @@ public class HostConfig implements LifecycleListener {
                     docBase = new File(host.getAppBaseFile(), context.getDocBase());
                 }
                 // If external docBase, register .xml as redeploy first
-                // 如果代码在不在webapps目录里
+                // 如果代码在webapps外部
                 if (!docBase.getCanonicalPath().startsWith(
                         host.getAppBaseFile().getAbsolutePath() + File.separator)) {
                     //外部标识符
@@ -635,7 +635,7 @@ public class HostConfig implements LifecycleListener {
                     deployedApp.redeployResources.put(
                             contextXml.getAbsolutePath(),
                             Long.valueOf(contextXml.lastModified()));
-                    // context.xml中配置的外部docBase的绝对路径
+                    // context.xml中配置的外部docBase的绝对路径 /外部/test.war||test
                     deployedApp.redeployResources.put(docBase.getAbsolutePath(),
                             Long.valueOf(docBase.lastModified()));
                     if (docBase.getAbsolutePath().toLowerCase(Locale.ENGLISH).endsWith(".war")) {
@@ -645,6 +645,7 @@ public class HostConfig implements LifecycleListener {
                     log.warn(sm.getString("hostConfig.deployDescriptor.localDocBaseSpecified",
                              docBase));
                     // Ignore specified docBase
+                    // 如果指定的代码在webapps下，则忽略docBase设置
                     context.setDocBase(null);
                 }
             }
@@ -658,8 +659,9 @@ public class HostConfig implements LifecycleListener {
             // Get paths for WAR and expanded WAR in appBase 获取war包路径然后解压到webapps目录中
 
             // default to appBase dir + name
+        	// /root/webapps/test
             expandedDocBase = new File(host.getAppBaseFile(), cn.getBaseName());
-            // 如果context指定的代码不为war包 如果docbase属性没有配置，
+            // 如果context指定的代码是外部的目录
             //那么就会去webapps下找context.xml名字的代码
             if (context.getDocBase() != null
                     && !context.getDocBase().toLowerCase(Locale.ENGLISH).endsWith(".war")) {
@@ -671,6 +673,7 @@ public class HostConfig implements LifecycleListener {
                     // if docBase specified and relative, it must be relative to appBase
                     expandedDocBase = new File(host.getAppBaseFile(), context.getDocBase());
                 }
+                // expandedDocBase /外部/test
             }
             //根据context unpackwar的配置来判断是否解包
             boolean unpackWAR = unpackWARs;
@@ -680,10 +683,10 @@ public class HostConfig implements LifecycleListener {
             //接下来查看到底是怎么部署项目还有deployedApp到底put记录什么东西
             // Add the eventual unpacked WAR and all the resources which will be
             // watched inside it
-            //如果war包在webapps外部
+            //如果代码是在webapps外部war包
             if (isExternalWar) {
                 if (unpackWAR) {
-                	// /外部/app.war
+                	// /外部/test
                     deployedApp.redeployResources.put(expandedDocBase.getAbsolutePath(),
                             Long.valueOf(expandedDocBase.lastModified()));
                     addWatchedResources(deployedApp, expandedDocBase.getAbsolutePath(), context);
@@ -691,13 +694,14 @@ public class HostConfig implements LifecycleListener {
                     addWatchedResources(deployedApp, null, context);
                 }   
             }
-            //如果是webapp目录中的代码
+            //如果在webapps中，或者是目录
             else {
                 // Find an existing matching war and expanded folder
-            	// 如果不是外部的
+            	// 如果是在webapps中的代码
                 if (!isExternal) {
                 	//获取文件的war文件描述符
                     File warDocBase = new File(expandedDocBase.getAbsolutePath() + ".war");
+                    //如果代码是war包
                     if (warDocBase.exists()) {
                     	// /root/webapps/app.war
                         deployedApp.redeployResources.put(warDocBase.getAbsolutePath(),
@@ -711,7 +715,7 @@ public class HostConfig implements LifecycleListener {
                     }
                 }
                 if (unpackWAR) {
-                	// /root/webapps/app/
+                	// /root/webapps/test/或者D:\workspace\WebApp\AppNam
                     deployedApp.redeployResources.put(expandedDocBase.getAbsolutePath(),
                             Long.valueOf(expandedDocBase.lastModified()));
                     addWatchedResources(deployedApp,

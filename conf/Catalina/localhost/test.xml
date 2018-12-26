@@ -1,1 +1,1 @@
-<Context path="/XXX" reloadable="true" docBase="D:\workspace\WebApp\AppName" workDir="D:\workspace\WebApp\work"/>  
+<Context path="/XXX" reloadable="true" docBase="AppName" workDir="D:\workspace\WebApp\work"/>  
