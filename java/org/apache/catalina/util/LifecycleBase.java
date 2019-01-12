@@ -91,6 +91,7 @@ public abstract class LifecycleBase implements Lifecycle {
      * @param data  Data associated with event.
      */
     protected void fireLifecycleEvent(String type, Object data) {
+    	//event对象里的source属性指向事件源也就是发生事件的对象
         LifecycleEvent event = new LifecycleEvent(this, type, data);
         for (LifecycleListener listener : lifecycleListeners) {
             listener.lifecycleEvent(event);

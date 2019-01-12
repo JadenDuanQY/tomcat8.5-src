@@ -294,14 +294,20 @@ public class HostConfig implements LifecycleListener {
      */
     @Override
     public void lifecycleEvent(LifecycleEvent event) {
-
+    	
+    	System.out.println("当前是"+event.getType());
         // Identify the host we are associated with
+    	// 每次状态变更都会执行下面的代码，如果直接指定可以更效率
         try {
+        	//getLifecycle返回的是source属性，source属性是LifecycleEvent实例化事被引用为发生事件的对象
             host = (Host) event.getLifecycle();
             if (host instanceof StandardHost) {
+            	//设置是否拷贝xml到conf目录下
                 setCopyXML(((StandardHost) host).isCopyXML());
                 setDeployXML(((StandardHost) host).isDeployXML());
+                //设置是否解包
                 setUnpackWARs(((StandardHost) host).isUnpackWARs());
+                //设置context class为org.apache.catalina.core.StandardContext
                 setContextClass(((StandardHost) host).getContextClass());
             }
         } catch (ClassCastException e) {
@@ -310,12 +316,15 @@ public class HostConfig implements LifecycleListener {
         }
 
         // Process the event that has occurred
+        // PERIODIC_EVENT事件触发是在容器的backgroundprocess执行的时候设置的，host先starting再启动backgroundprocess
         if (event.getType().equals(Lifecycle.PERIODIC_EVENT)) {
             check();
         } else if (event.getType().equals(Lifecycle.BEFORE_START_EVENT)) {
+        	//如果目录不存在则创建 webapps与conf/catalina/localhost目录
             beforeStart();
         } else if (event.getType().equals(Lifecycle.START_EVENT)) {
-            start();
+            //host start（）时调用
+        	start();
         } else if (event.getType().equals(Lifecycle.STOP_EVENT)) {
             stop();
         }
@@ -396,7 +405,7 @@ public class HostConfig implements LifecycleListener {
     protected static Digester createDigester(String contextClassName) {
         Digester digester = new Digester();
         digester.setValidating(false);
-        // Add object creation rule
+        // Add object creation rule contextclassname是standardcontext
         digester.addObjectCreate("Context", contextClassName, "className");
         // Set the properties on that object (it doesn't matter if extra
         // properties are set)
@@ -431,11 +440,14 @@ public class HostConfig implements LifecycleListener {
      * in our "application root" directory.
      */
     protected void deployApps() {
-
+    	//tomcat根目录下的webapps
         File appBase = host.getAppBaseFile();
+        //tomcat根目录下的conf/catalina/localhost
         File configBase = host.getConfigBaseFile();
+        //根据host对象中的deployignore属性过滤不需要部署的文件
         String[] filteredAppPaths = filterAppPaths(appBase.list());
         // Deploy XML descriptors from configBase
+        // 读取conf/Catalina/localhost/中所有的.xml文件，配置
         deployDescriptors(configBase, configBase.list());
         // Deploy WARs
         deployWARs(appBase, filteredAppPaths);
@@ -531,18 +543,21 @@ public class HostConfig implements LifecycleListener {
             File contextXml = new File(configBase, files[i]);
 
             if (files[i].toLowerCase(Locale.ENGLISH).endsWith(".xml")) {
+            	//name: test   path: /test/
                 ContextName cn = new ContextName(files[i], true);
-
+                //如果deployment中已经添加了该应用或者serviced list中包含该应用则忽略执行下一个context.xml部署
                 if (isServiced(cn.getName()) || deploymentExists(cn.getName()))
                     continue;
-
+                //老方法，使用es线程池（host的线程池）来执行DeployDescriptor内部类（runnable实现类）
+                //DeployDescriptor会调用传入的this的deployDescriptor方法
                 results.add(
                         es.submit(new DeployDescriptor(this, cn, contextXml)));
             }
         }
-
+        //等待所有的Future执行完毕
         for (Future<?> result : results) {
             try {
+            	//等待Future执行完毕
                 result.get();
             } catch (Exception e) {
                 log.error(sm.getString(
@@ -577,6 +592,8 @@ public class HostConfig implements LifecycleListener {
         File expandedDocBase = null;
 
         try (FileInputStream fis = new FileInputStream(contextXml)) {
+        	//加锁是因为线程池里的DeployDescriptor线程都调用同一个HostConfig对象的deployDescriptor
+        	//为了保障线程并发执行时digester的解析配置唯一
             synchronized (digesterLock) {
                 try {
                     context = (Context) digester.parse(fis);
@@ -601,18 +618,24 @@ public class HostConfig implements LifecycleListener {
             context.setPath(cn.getPath());
             context.setWebappVersion(cn.getVersion());
             // Add the associated docBase to the redeployed list if it's a WAR
+            // docbase是源代码路径
             if (context.getDocBase() != null) {
                 File docBase = new File(context.getDocBase());
+                //如果是相对路径，就去webapps下面去找
                 if (!docBase.isAbsolute()) {
                     docBase = new File(host.getAppBaseFile(), context.getDocBase());
                 }
                 // If external docBase, register .xml as redeploy first
+                // 如果代码在webapps外部
                 if (!docBase.getCanonicalPath().startsWith(
                         host.getAppBaseFile().getAbsolutePath() + File.separator)) {
-                    isExternal = true;
+                    //外部标识符
+                	isExternal = true;
+                	// /root/conf/catalina/localhost/context.xml
                     deployedApp.redeployResources.put(
                             contextXml.getAbsolutePath(),
                             Long.valueOf(contextXml.lastModified()));
+                    // context.xml中配置的外部docBase的绝对路径 /外部/test.war||test
                     deployedApp.redeployResources.put(docBase.getAbsolutePath(),
                             Long.valueOf(docBase.lastModified()));
                     if (docBase.getAbsolutePath().toLowerCase(Locale.ENGLISH).endsWith(".war")) {
@@ -622,60 +645,77 @@ public class HostConfig implements LifecycleListener {
                     log.warn(sm.getString("hostConfig.deployDescriptor.localDocBaseSpecified",
                              docBase));
                     // Ignore specified docBase
+                    // 如果指定的代码在webapps下，则忽略docBase设置
                     context.setDocBase(null);
                 }
             }
-
+            //host添加子容器（standardcontext）
             host.addChild(context);
         } catch (Throwable t) {
             ExceptionUtils.handleThrowable(t);
             log.error(sm.getString("hostConfig.deployDescriptor.error",
                                    contextXml.getAbsolutePath()), t);
         } finally {
-            // Get paths for WAR and expanded WAR in appBase
+            // Get paths for WAR and expanded WAR in appBase 获取war包路径然后解压到webapps目录中
 
             // default to appBase dir + name
+        	// /root/webapps/test
             expandedDocBase = new File(host.getAppBaseFile(), cn.getBaseName());
+            // 如果context指定的代码是外部的目录
+            //那么就会去webapps下找context.xml名字的代码
             if (context.getDocBase() != null
                     && !context.getDocBase().toLowerCase(Locale.ENGLISH).endsWith(".war")) {
-                // first assume docBase is absolute
-                expandedDocBase = new File(context.getDocBase());
+                // first assume docBase is absolute 确认context.getDocBase()是绝对路径
+            	// 设置绝对路径的expandedDocBase文件描述符
+            	expandedDocBase = new File(context.getDocBase());
+            	// 如果docbase是相对路径，那么就是指的webapps目录下的代码
                 if (!expandedDocBase.isAbsolute()) {
                     // if docBase specified and relative, it must be relative to appBase
                     expandedDocBase = new File(host.getAppBaseFile(), context.getDocBase());
                 }
+                // expandedDocBase /外部/test
             }
-
+            //根据context unpackwar的配置来判断是否解包
             boolean unpackWAR = unpackWARs;
             if (unpackWAR && context instanceof StandardContext) {
                 unpackWAR = ((StandardContext) context).getUnpackWAR();
             }
-
+            //接下来查看到底是怎么部署项目还有deployedApp到底put记录什么东西
             // Add the eventual unpacked WAR and all the resources which will be
             // watched inside it
+            //如果代码是在webapps外部war包
             if (isExternalWar) {
                 if (unpackWAR) {
+                	// /外部/test
                     deployedApp.redeployResources.put(expandedDocBase.getAbsolutePath(),
                             Long.valueOf(expandedDocBase.lastModified()));
                     addWatchedResources(deployedApp, expandedDocBase.getAbsolutePath(), context);
                 } else {
                     addWatchedResources(deployedApp, null, context);
-                }
-            } else {
+                }   
+            }
+            //如果在webapps中，或者是目录
+            else {
                 // Find an existing matching war and expanded folder
+            	// 如果是在webapps中的代码
                 if (!isExternal) {
+                	//获取文件的war文件描述符
                     File warDocBase = new File(expandedDocBase.getAbsolutePath() + ".war");
+                    //如果代码是war包
                     if (warDocBase.exists()) {
+                    	// /root/webapps/app.war
                         deployedApp.redeployResources.put(warDocBase.getAbsolutePath(),
                                 Long.valueOf(warDocBase.lastModified()));
                     } else {
                         // Trigger a redeploy if a WAR is added
+                    	// /root/webapps/app.war
                         deployedApp.redeployResources.put(
                                 warDocBase.getAbsolutePath(),
                                 Long.valueOf(0));
                     }
                 }
                 if (unpackWAR) {
+                	// /root/webapps/test/或者D:\workspace\WebApp\AppNam
                     deployedApp.redeployResources.put(expandedDocBase.getAbsolutePath(),
                             Long.valueOf(expandedDocBase.lastModified()));
                     addWatchedResources(deployedApp,
@@ -683,6 +723,7 @@ public class HostConfig implements LifecycleListener {
                 } else {
                     addWatchedResources(deployedApp, null, context);
                 }
+                //如果指定的代码在webapps下面
                 if (!isExternal) {
                     // For external docBases, the context.xml will have been
                     // added above.
@@ -693,9 +734,11 @@ public class HostConfig implements LifecycleListener {
             }
             // Add the global redeploy resources (which are never deleted) at
             // the end so they don't interfere with the deletion process
+            //添加conf/context.xml 和 conf/catalina/localhost/context.xml.default(如果存在的话)到deployedApp
+            //中的redeployResources
             addGlobalRedeployResources(deployedApp);
         }
-
+        //如果host子容器中添加了该context
         if (host.findChild(context.getName()) != null) {
             deployed.put(context.getName(), deployedApp);
         }
@@ -1545,8 +1588,11 @@ public class HostConfig implements LifecycleListener {
 
     public void beforeStart() {
         if (host.getCreateDirs()) {
+        	//tomcat根目录下的(webapps文件描述符和conf/catalina/localhost文件描述符)
             File[] dirs = new File[] {host.getAppBaseFile(),host.getConfigBaseFile()};
+            //创建这两个目录
             for (int i=0; i<dirs.length; i++) {
+            	//如果文件描述符已被创建且不是目录报error
                 if (!dirs[i].mkdirs() && !dirs[i].isDirectory()) {
                     log.error(sm.getString("hostConfig.createDirs",dirs[i]));
                 }
@@ -1564,6 +1610,7 @@ public class HostConfig implements LifecycleListener {
             log.debug(sm.getString("hostConfig.start"));
 
         try {
+        	//host注册jmx返回的objectname
             ObjectName hostON = host.getObjectName();
             oname = new ObjectName
                 (hostON.getDomain() + ":type=Deployer,host=" + host.getName());
@@ -1572,7 +1619,8 @@ public class HostConfig implements LifecycleListener {
         } catch (Exception e) {
             log.error(sm.getString("hostConfig.jmx.register", oname), e);
         }
-
+        
+        //判断appbasefile是否为文件夹 Tomcat根目录下的webapps
         if (!host.getAppBaseFile().isDirectory()) {
             log.error(sm.getString("hostConfig.appBase", host.getName(),
                     host.getAppBaseFile().getPath()));
@@ -1609,7 +1657,8 @@ public class HostConfig implements LifecycleListener {
      * Check status of all webapps.
      */
     protected void check() {
-
+    	
+    	//standardhost默认自动部署
         if (host.getAutoDeploy()) {
             // Check for resources modification to trigger redeployment
             DeployedApplication[] apps =

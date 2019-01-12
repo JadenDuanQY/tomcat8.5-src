@@ -229,11 +229,14 @@ public class StandardHost extends ContainerBase implements Host {
         File file = new File(getAppBase());
 
         // If not absolute, make it absolute
+        //判断是否为绝对路径
         if (!file.isAbsolute()) {
+        	//获取在Tomcat根目录下的webapps的文件描述符
             file = new File(getCatalinaBase(), file.getPath());
         }
 
         // Make it canonical if possible
+        //获取规范路径的文件描述符
         try {
             file = file.getCanonicalFile();
         } catch (IOException ioe) {
@@ -312,14 +315,17 @@ public class StandardHost extends ContainerBase implements Host {
             Container parent = getParent();
             if (parent instanceof Engine) {
                 xmlDir.append('/');
+                //engine的名字是catalina
                 xmlDir.append(parent.getName());
             }
             xmlDir.append('/');
+            //host的name是localhost
             xmlDir.append(getName());
             path = xmlDir.toString();
         }
         File file = new File(path);
         if (!file.isAbsolute())
+        	//tomcat根目录下的conf/catalina/localhost文件描述符
             file = new File(getCatalinaBase(), path);
         try {
             file = file.getCanonicalFile();
@@ -725,7 +731,8 @@ public class StandardHost extends ContainerBase implements Host {
      */
     @Override
     public void addChild(Container child) {
-
+    	
+    	//context添加内存泄露监听器
         child.addLifecycleListener(new MemoryLeakTrackingListener());
 
         if (!(child instanceof Context))
@@ -845,7 +852,7 @@ public class StandardHost extends ContainerBase implements Host {
     @Override
     protected synchronized void startInternal() throws LifecycleException {
 
-        // Set error report valve
+        // Set error report valve 默认就有值 org.apache.catalina.valves.ErrorReportValve
         String errorValve = getErrorReportValveClass();
         if ((errorValve != null) && (!errorValve.equals(""))) {
             try {
@@ -869,6 +876,7 @@ public class StandardHost extends ContainerBase implements Host {
                         errorValve), t);
             }
         }
+        //standrdhost是如何添加context的
         super.startInternal();
     }
 

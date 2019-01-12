@@ -288,22 +288,28 @@ public class Catalina {
         fakeAttributes.put(Object.class, attrs);
         digester.setFakeAttributes(fakeAttributes);
         digester.setUseContextClassLoader(true);
-
+        
+        //addObjectCreate 根据第一个参数匹配到的标签创建指定类型的对象
+        
         // Configure the actions we will be using
+        //server对象创建
         digester.addObjectCreate("Server",
                                  "org.apache.catalina.core.StandardServer",
                                  "className");
+        //根据标签中的属性设置server对象对应的属性
         digester.addSetProperties("Server");
+        //执行上面的server对象的setserver方法，参数是自身
         digester.addSetNext("Server",
                             "setServer",
                             "org.apache.catalina.Server");
-
+        
         digester.addObjectCreate("Server/GlobalNamingResources",
                                  "org.apache.catalina.deploy.NamingResourcesImpl");
         digester.addSetProperties("Server/GlobalNamingResources");
         digester.addSetNext("Server/GlobalNamingResources",
                             "setGlobalNamingResources",
                             "org.apache.catalina.deploy.NamingResourcesImpl");
+        
         //listener属性配置 null的话，在xml里配置linstener时 classname必须不能为空
         digester.addObjectCreate("Server/Listener",
                                  null, // MUST be specified in the element
@@ -395,7 +401,9 @@ public class Catalina {
 
         // Add RuleSets for nested elements
         digester.addRuleSet(new NamingRuleSet("Server/GlobalNamingResources/"));
+        //初始化engine同时添加org.apache.catalina.startup.EngineConfig监听器
         digester.addRuleSet(new EngineRuleSet("Server/Service/"));
+        //初始化 standardhost 同时添加org.apache.catalina.startup.HostConfig监听器
         digester.addRuleSet(new HostRuleSet("Server/Service/Engine/"));
         digester.addRuleSet(new ContextRuleSet("Server/Service/Engine/Host/"));
         addClusterRuleSet(digester, "Server/Service/Engine/Host/Cluster/");
@@ -548,6 +556,7 @@ public class Catalina {
         try {
             try {
                 file = configFile();
+                //加载conf/server.xml
                 inputStream = new FileInputStream(file);
                 inputSource = new InputSource(file.toURI().toURL().toString());
             } catch (Exception e) {
@@ -626,6 +635,8 @@ public class Catalina {
         }
 
         getServer().setCatalina(this);
+        //设置catalinahomefile和catalinabase同为D:\development\workspace\tomcat8.5-src
+        //也就是Tomcat根目录
         getServer().setCatalinaHome(Bootstrap.getCatalinaHomeFile());
         getServer().setCatalinaBase(Bootstrap.getCatalinaBaseFile());
 

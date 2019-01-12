@@ -749,6 +749,7 @@ public abstract class ContainerBase extends LifecycleMBeanBase
         // Start child
         // Don't do this inside sync block - start can be a slow process and
         // locking the children object can cause problems elsewhere
+        // 已经启动的standardhost会在此处启动conf/Catalina/localhost/中xml配置的context
         try {
             if ((getState().isAvailable() ||
                     LifecycleState.STARTING_PREP.equals(getState())) &&
@@ -944,18 +945,27 @@ public abstract class ContainerBase extends LifecycleMBeanBase
          *	3. FutureTask继承并实现了Runable接口，run方法会调用初始化传入的Callable对象的call方法
          *	4. StartChild的call方法会执行构造函数传入的对象Container类型的start方法
          */
-        //此处有一个child host
+        //此处有一个child是host
+        //submit方法会初始化future对象并执行调用线程执行器的execute开了一个线程执行future（runable），就会调用childs的start（）方法
+        //因为只有一个child host 那么就会执行host 的start方法，还是老流程，lifecyclebase start(是否初始化。没有就
+        //初始化再start)- lifecyclembeanbase startinternal(注册mbean) - 
+        //本身重写的startinternal
         
-        //容器链启动对valve的影响
+        //engine会在此处启动在server.xml里配置的子容器（host）
+        //host在此处也会启动在server.xml里配置的子容器（context)
         List<Future<Void>> results = new ArrayList<>();
         for (int i = 0; i < children.length; i++) {
+        	//startStopExecutor调用execute方法执行Callable为StartChild对象的Future对象
+        	//并返回future对象
             results.add(startStopExecutor.submit(new StartChild(children[i])));
         }
 
         MultiThrowable multiThrowable = new MultiThrowable();
 
+        //等待所有的Future执行完毕
         for (Future<Void> result : results) {
             try {
+            	//等待Future执行完毕
                 result.get();
             } catch (Throwable e) {
                 log.error(sm.getString("containerBase.threadedStartFailed"), e);
@@ -978,7 +988,8 @@ public abstract class ContainerBase extends LifecycleMBeanBase
             ((Lifecycle) pipeline).start();
         }
 
-
+        //standardhost容器设置了starting状态后会出发hostconfig的事件处理流程
+        //hostconfig主要是扫描/root/conf/Catalina/localhost/下的xml文件并加载和启动相应的context
         setState(LifecycleState.STARTING);
 
         // Start our thread 这个线程是backgroundProcess线程
