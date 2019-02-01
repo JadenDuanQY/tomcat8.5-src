@@ -876,7 +876,8 @@ public class StandardHost extends ContainerBase implements Host {
                         errorValve), t);
             }
         }
-        //standrdhost是如何添加context的
+        //standrdhost调用父类ContainerBase的startInternal()方法，
+        //该方法会设置容器生命周期状态为STARING并触发hostconfig事件来加载并初始化context容器
         super.startInternal();
     }
 

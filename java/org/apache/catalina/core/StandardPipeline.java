@@ -181,10 +181,10 @@ public class StandardPipeline extends LifecycleBase
         }
         while (current != null) {
             if (current instanceof Lifecycle)
+            	//valve启动只是设置的生命周期状态为STARING
                 ((Lifecycle) current).start();
             current = current.getNext();
         }
-
         setState(LifecycleState.STARTING);
     }
 

@@ -357,7 +357,8 @@ public abstract class LifecycleBase implements Lifecycle {
             throws LifecycleException {
         setStateInternal(state, data, true);
     }
-
+    
+    //设置生命周期状态 LifecycleState 初始化时就决定了LifecycleState的available的值（true or false）
     private synchronized void setStateInternal(LifecycleState state,
             Object data, boolean check) throws LifecycleException {
 
@@ -394,6 +395,7 @@ public abstract class LifecycleBase implements Lifecycle {
 
         this.state = state;
         String lifecycleEvent = state.getLifecycleEvent();
+        //每次设置生命周期状态时会遍历执行生命周期的监听器
         if (lifecycleEvent != null) {
             fireLifecycleEvent(lifecycleEvent, data);
         }
